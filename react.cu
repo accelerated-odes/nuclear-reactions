@@ -18,24 +18,27 @@ __global__ void rates(float *a, float *temp, float *lam, int nsets, int ncells, 
     int jstart = blockIdx.y * blockDim.y + threadIdx.y;
     int jstep = blockDim.y * gridDim.y;
     
+    int kstart = blockIdx.z * blockDim.z + threadIdx.z;
+    int kstep = blockDim.z * gridDim.z;
+    
     for(int i = istart; i < nsets; i += istep)
     {
         for(int j = jstart; j < ncells; j += jstep)
         {
             float temp9 = temp[j] * 1.0e-9;
             
-            for(int k = 0; k < ncoeff; k++)
+            for(int k = kstart; k < ncoeff; k += kstep)
             {
                 switch(k)
                 {
                     case 0:
-                        lam[i * ncells + j] += a[i * ncoeff + k]; 
+                        atomicAdd(&lam[i * ncells + j], a[i * ncoeff + k]);
                         break;
                     case 6: 
-                        lam[i * ncells + j] += a[i * ncoeff + k] * logf(temp9); 
+                        atomicAdd(&lam[i * ncells + j], a[i * ncoeff + k] * logf(temp9)); 
                         break;
                     default: 
-                        lam[i * ncells + j] += a[i * ncoeff + k] * powf(temp9, (2 * k - 5) / 3.0f); 
+                        atomicAdd(&lam[i * ncells + j], a[i * ncoeff + k] * powf(temp9, (2 * k - 5) / 3.0f)); 
                         break;
                 }
             }
@@ -106,15 +109,15 @@ int main()
     {
         for(j = 0; j < ncells; j++)
         {
-            lam[i * ncells + j] = 0.0f;
+            lam[i * ncells + j] = 0.0;
         }
     }
     
     /****************************************************************
     * Compute ln(lambda) for each set and cell and print the result *
-    *****************************************************************/
-    dim3 threadsPerBlock(nsets, ncells);
-    dim3 numBlocks(1, 1);
+    ****************************************************************/
+    dim3 threadsPerBlock(nsets, ncells, ncoeff);
+    dim3 numBlocks(1, 1, 1);
     
     cudaEventRecord(start);
     rates<<<numBlocks, threadsPerBlock>>>(a, temp, lam, nsets, ncells, ncoeff);
@@ -135,7 +138,7 @@ int main()
     
     /*********************
     * Print elapsed time *
-    **********************/
+    *********************/
     cudaEventSynchronize(stop);
     float elapsed = 0.0f;
     cudaEventElapsedTime(&elapsed, start, stop);
