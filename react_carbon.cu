@@ -179,11 +179,12 @@ __global__ void exec(dtype *lam)
 int main()
 {
     // Tensor dimensions
-    const int nsets = 6, ncells = 10, ncoeff = 7;
+    const int nsets = 6, ncells = 50, ncoeff = 7;
     
     // Results matrix
     float *lam;
-    cudaMallocManaged(&lam, nsets * ncells * sizeof(float));
+    cudaError_t code = cudaMallocManaged(&lam, nsets * ncells * sizeof(float));
+    if(code != cudaSuccess) return -1;
     
     for(int i = 0; i < nsets; i++)
     {
