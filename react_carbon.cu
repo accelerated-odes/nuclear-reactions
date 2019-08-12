@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <fstream>
 
 /**
 * Computes the log of reaction rate.
@@ -179,11 +180,11 @@ __global__ void exec(dtype *lam)
 int main()
 {
     // Tensor dimensions
-    const int nsets = 6, ncells = 50, ncoeff = 7;
+    const int nsets = 6, ncells = 10, ncoeff = 7;
     
     // Results matrix
-    float *lam;
-    cudaError_t code = cudaMallocManaged(&lam, nsets * ncells * sizeof(float));
+    double *lam;
+    cudaError_t code = cudaMallocManaged(&lam, nsets * ncells * sizeof(double));
     if(code != cudaSuccess) return -1;
     
     for(int i = 0; i < nsets; i++)
@@ -199,21 +200,28 @@ int main()
     // Compute the rates
     dim3 threadsPerBlock(nsets, ncells, ncoeff);
     dim3 numBlocks(1, 1, 1);
-    exec<float, nsets, ncells, ncoeff><<<numBlocks, threadsPerBlock>>>(lam);
+    exec<double, nsets, ncells, ncoeff><<<numBlocks, threadsPerBlock>>>(lam);
     
-    // Print ln(lambda)
+    // Write lambda to file
     cudaDeviceSynchronize();
-    printf("lambda:\n");
+    
+    std::ofstream file;
+    file.open("double.dat");
     
     for(int i = 0; i < nsets; i++)
     {
         for(int j = 0; j < ncells; j++)
         {
-            printf("%8.3f   ", lam[i * ncells + j]);
+            printf("%8.3f ", lam[i * ncells + j]);
+            file << exp(lam[i * ncells + j]);
+            if(j != ncells - 1) file << " ";
         }
         
+        file << "\n";
         printf("\n");
     }
+    
+    file.close();
     
     return 0;
 }
